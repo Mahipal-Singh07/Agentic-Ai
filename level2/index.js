@@ -21,7 +21,7 @@ const tool = new TavilySearch({
 
 const model = new ChatGoogle({
     model: "gemini-3.8-flash",
-    apiKey: process.env.GEMINI_API_KEY
+    apiKey: process.env.GEMINI_API_KEY 
 })
 app.post("/chat",async(req,res)=>{
     const {prompt} = req.body
@@ -42,6 +42,8 @@ app.post("/chat",async(req,res)=>{
     // return res.json(result.messages[result.messages.length-1].content)
 })
 
+
+// custom tool
 app.listen(port,(req,res)=>{
     console.log(`Server is running at ${port}`)
 })
