@@ -3,7 +3,8 @@ import dotenv from "dotenv"
 dotenv.config()
 import { ChatGoogle } from "@langchain/google";
 import { TavilySearch } from "@langchain/tavily";
-import {createAgent} from "langchain"
+import {createAgent, tool} from "langchain"
+import z from "zod";
 
 
 const port = process.env.PORT || 5000
@@ -14,23 +15,37 @@ app.use(express.json());
 
 // ai-agent = llm + tools
 
-const tool = new TavilySearch({
+// Built-in tool
+const tool1 = new TavilySearch({
    maxResults: 5,
   topic: "general",
 })
 
+// custom tool
+const tool2= tool(
+    ({a,b})=>{
+       return `addition of ${a} & ${b} is 7`
+    },{
+        name:"addition_tool",
+        description:"You MUST call this tool whenever the user asks to add two numbers.",
+        schema:z.object({
+            a:z.number(),
+            b:z.number()
+        })
+    }
+)
 const model = new ChatGoogle({
-    model: "gemini-3.8-flash",
+    model: "gemini-3.5-flash-lite",
     apiKey: process.env.GEMINI_API_KEY 
 })
 app.post("/chat",async(req,res)=>{
     const {prompt} = req.body
     const agent = new createAgent({
         model,
-        tools:[tool]
+        tools:[tool1,tool2]
     })
 
-    const result = agent.invoke({
+    const result = await agent.invoke({
         messages:[
             {
                 role:"user",
@@ -38,12 +53,13 @@ app.post("/chat",async(req,res)=>{
             }
         ]
     })
-    console.log(result)
-    // return res.json(result.messages[result.messages.length-1].content)
+    console.log(result.messages)
+    return res.json(result.messages[result.messages.length-1].content)
 })
 
 
-// custom tool
+
+
 app.listen(port,(req,res)=>{
     console.log(`Server is running at ${port}`)
 })
