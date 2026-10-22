@@ -4,7 +4,9 @@ dotenv.config()
 import { ChatGoogle } from "@langchain/google";
 import { TavilySearch } from "@langchain/tavily";
 import {createAgent, tool} from "langchain"
+import { ToolNode } from "@langchain/langgraph/prebuilt";
 import z from "zod";
+import { MessagesAnnotation, StateGraph } from "@langchain/langgraph";
 
 
 const port = process.env.PORT || 5000
@@ -50,31 +52,93 @@ const tool3 = tool(
         }
     
 )
-const model = new ChatGoogle({
-    model: "gemini-3.5-flash-lite",
-    apiKey: process.env.GEMINI_API_KEY 
-})
-app.post("/chat",async(req,res)=>{
-    const {prompt} = req.body
-    const agent = createAgent({
-        model,
-        tools:[tool1,tool2,tool3]
-    })
 
-    const result = await agent.invoke({
+// with langchain 
+
+// const model = new ChatGoogle({
+//     model: "gemini-3.5-flash-lite",
+//     apiKey: process.env.GEMINI_API_KEY 
+// })
+// app.post("/chat",async(req,res)=>{
+//     const {prompt} = req.body
+//     const agent = createAgent({
+//         model,
+//         tools:[tool1,tool2,tool3],
+//         systemPrompt:"use tools for external knowledge , do not use your knowledge"
+//     })
+
+//     const result = await agent.invoke({
+//         messages:[
+//             {
+//                 role:"user",
+//                 content:prompt
+//             }
+//         ]
+//     })
+//     console.log(result.messages)
+//     return res.json(result.messages[result.messages.length-1].content)
+// })
+
+
+// with langGraph
+
+const tools = [tool1,tool2,tool3]
+
+const model = new ChatGoogle({
+   model: "gemini-3.5-flash-lite",
+     apiKey: process.env.GEMINI_API_KEY 
+}).bindTools(tools)
+
+const toolNode = new ToolNode(tools)
+
+const agent = async (state)=>{
+const result = await model.invoke(
+    state.messages
+)
+
+return {
+    messages:[result]
+}
+}
+
+// state=[
+//     humanMessage:"",
+//     AiMessage:"",
+//     toolMessage:"",
+//     AiMessages:""
+// ]
+
+const shouldContinue= async (state)=>{
+    if(state.messages[state.messages.length-1].tool_calls.length>0){
+        return "tool_node"
+    }else{
+        return "__end__"
+    }
+}
+
+const graph = new StateGraph(MessagesAnnotation)
+.addNode("agent_node", agent )
+.addNode("tool_node",toolNode)
+.addEdge("__start__","agent_node")
+.addConditionalEdges("agent_node",shouldContinue)
+.addEdge("tool_node","agent_node")
+.compile()
+
+app.post("/chat",async(req,res)=>{
+    const {prompt}= req.body
+
+    const result = await graph.invoke({
         messages:[
             {
-                role:"user",
-                content:prompt
+            role:"user",
+            content:prompt
             }
         ]
     })
+
     console.log(result.messages)
     return res.json(result.messages[result.messages.length-1].content)
 })
-
-
-
 
 app.listen(port,(req,res)=>{
     console.log(`Server is running at ${port}`)
