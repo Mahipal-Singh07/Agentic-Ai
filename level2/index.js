@@ -34,15 +34,31 @@ const tool2= tool(
         })
     }
 )
+
+const tool3 = tool(
+    
+        ({email,content})=>{
+                return `email sent to ${email} with content is ${content}`
+        },
+        {
+            name:"sent_mail",
+            description:"use this tool to send mail",
+            schema:z.object({
+                email:z.string().describe("sender mail"),
+                content:z.string().describe("send mail with content")
+            })
+        }
+    
+)
 const model = new ChatGoogle({
     model: "gemini-3.5-flash-lite",
     apiKey: process.env.GEMINI_API_KEY 
 })
 app.post("/chat",async(req,res)=>{
     const {prompt} = req.body
-    const agent = new createAgent({
+    const agent = createAgent({
         model,
-        tools:[tool1,tool2]
+        tools:[tool1,tool2,tool3]
     })
 
     const result = await agent.invoke({
