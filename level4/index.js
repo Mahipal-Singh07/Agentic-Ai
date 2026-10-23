@@ -49,6 +49,24 @@ const upload=async ()=>{
     await vectorStore.addDocuments(docs)
 }
 
+ app.post("/chat",async (req,res)=>{
+   const {prompt}=req.body
+   const docs=await vectorStore.similaritySearch(prompt,5)
+   const context=docs.map(doc=>doc.pageContent).join("/n")
+   const result=await model.invoke([
+    {
+        role:"system",
+        content:`you are a rag assistant and use this context ${context}`
+    },
+    {
+        role:"human",
+        content:prompt
+    }
+   ])
+   return res.json(result.content)
+})
+
+
 
 
 app.listen(port, () => {
